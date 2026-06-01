@@ -3,6 +3,7 @@ import json
 import shutil
 import subprocess
 import uuid
+import json
 from datetime import datetime
 from pathlib import Path
 from flask import Flask, render_template, request, jsonify, send_from_directory
@@ -21,6 +22,8 @@ app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max upload
 socketio = SocketIO(app, cors_allowed_origins="*")
 
 # Global state
+terminal_processes = {}  # sid -> ptyprocess.PtyProcess
+terminal_read_threads = {}  # sid -> threading.Thread
 instances_registry = {}  # instance_id -> metadata
 current_instance_id = None
 bootstrapper = InstanceBootstrapper()
@@ -459,6 +462,79 @@ def handle_connect():
     emit('instances_changed', {'instances': list(instances_registry.values())})
     if current_instance_id:
         emit('active_instance_changed', {'instance_id': current_instance_id})
+        
+@socketio.on('terminal_start')
+def handle_terminal_start():
+    """Spawn a root shell for the client."""
+    sid = request.sid
+    if sid in terminal_processes:
+        # already running
+        return
+    
+    try:
+        # Spawn bash with sudo to become root (requires NOPASSWD in sudoers)
+        # Alternatively use ['/bin/bash'] if app is already root.
+        proc = ptyprocess.PtyProcess.spawn(['sudo', '-i'], echo=False)
+        terminal_processes[sid] = proc
+        
+        # Start reading thread
+        def read_output():
+            while sid in terminal_processes and proc.isalive():
+                try:
+                    # Use select to avoid blocking forever
+                    r, _, _ = select.select([proc.fd], [], [], 0.1)
+                    if r:
+                        data = proc.read(4096)
+                        if data:
+                            socketio.emit('terminal_output', {'data': data}, room=sid)
+                    else:
+                        # Check if process died
+                        if not proc.isalive():
+                            break
+                except Exception as e:
+                    print(f"Terminal read error: {e}")
+                    break
+            # Cleanup on exit
+            cleanup_terminal(sid)
+        
+        thread = threading.Thread(target=read_output, daemon=True)
+        thread.start()
+        terminal_read_threads[sid] = thread
+        socketio.emit('terminal_ready', room=sid)
+    except Exception as e:
+        socketio.emit('terminal_error', {'message': str(e)}, room=sid)
+
+@socketio.on('terminal_input')
+def handle_terminal_input(data):
+    sid = request.sid
+    proc = terminal_processes.get(sid)
+    if proc and proc.isalive():
+        try:
+            proc.write(data.get('data', ''))
+        except Exception as e:
+            print(f"Write error: {e}")
+
+@socketio.on('terminal_resize')
+def handle_terminal_resize(data):
+    sid = request.sid
+    proc = terminal_processes.get(sid)
+    if proc and proc.isalive():
+        try:
+            proc.setwinsize(rows=data.get('rows', 24), cols=data.get('cols', 80))
+        except Exception as e:
+            print(f"Resize error: {e}")
+
+def cleanup_terminal(sid):
+    """Kill process and remove references."""
+    proc = terminal_processes.pop(sid, None)
+    if proc and proc.isalive():
+        proc.terminate(force=True)
+    terminal_read_threads.pop(sid, None)
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    sid = request.sid
+    cleanup_terminal(sid)
 
 # ==================== Main ====================
 
