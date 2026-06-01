@@ -486,6 +486,8 @@ def handle_terminal_input(data):
     proc = terminal_processes.get(sid)
     if proc and proc.isalive():
         try:
+            # Add this line for debugging (remove later)
+            print(f"Terminal input: {data.get('data', '')}")
             proc.write(data.get('data', ''))
         except Exception as e:
             print(f"Write error: {e}")
