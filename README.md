@@ -84,7 +84,7 @@ project/
 
 ```bash
 # Clone or download the project
-git clone <your-repo-url>
+git clone https://github.com/CreeperRick/Multi-Runtime-Instance
 cd project
 
 # Install Python dependencies
