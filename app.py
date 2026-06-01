@@ -453,10 +453,11 @@ def handle_terminal_start():
     if sid in terminal_processes:
         return
     try:
-        # Spawn interactive bash with proper terminal type
         env = os.environ.copy()
         env['TERM'] = 'xterm-256color'
         proc = ptyprocess.PtyProcess.spawn(['/bin/bash', '-i'], env=env, echo=False)
+        # Set initial window size
+        proc.setwinsize(24, 80)
         terminal_processes[sid] = proc
 
         def read_output():
@@ -465,10 +466,12 @@ def handle_terminal_start():
                 try:
                     r, _, _ = select.select([proc.fd], [], [], 0.1)
                     if r:
-                        data = proc.read(4096)
-                        if data:
-                            print(f"Terminal output: {len(data)} bytes")
-                            socketio.emit('terminal_output', {'data': data}, room=sid)
+                        data_bytes = proc.read(4096)
+                        if data_bytes:
+                            # Decode bytes to string (UTF-8) – handle errors gracefully
+                            data_str = data_bytes.decode('utf-8', errors='replace')
+                            print(f"Terminal output: {len(data_str)} chars")
+                            socketio.emit('terminal_output', {'data': data_str}, room=sid)
                 except Exception as e:
                     print(f"Terminal read error: {e}")
                     break
@@ -488,8 +491,10 @@ def handle_terminal_input(data):
     proc = terminal_processes.get(sid)
     if proc and proc.isalive():
         try:
-            print(f"Terminal input: {data.get('data', '')!r}")  # debug
-            proc.write(data.get('data', ''))
+            input_str = data.get('data', '')
+            print(f"Terminal input: {input_str!r}")
+            # Convert string to bytes (ptyprocess expects bytes)
+            proc.write(input_str.encode())
         except Exception as e:
             print(f"Write error: {e}")
 
@@ -508,6 +513,7 @@ def cleanup_terminal(sid):
     if proc and proc.isalive():
         proc.terminate(force=True)
     terminal_read_threads.pop(sid, None)
+    
 # ==================== SocketIO Events ====================
 
 @socketio.on('connect')
