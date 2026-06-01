@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multi-Instance Code Runner</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar: Instance Manager -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h2>Instances</h2>
+                <button id="createInstanceBtn" class="btn btn-primary">+ New</button>
+            </div>
+            <div class="instance-controls">
+                <input type="text" id="searchInstances" placeholder="Search instances..." class="search-input">
+                <select id="sortInstances" class="sort-select">
+                    <option value="name">Sort by Name</option>
+                    <option value="creation_date">Sort by Date</option>
+                    <option value="last_used">Sort by Last Used</option>
+                </select>
+            </div>
+            <div id="instanceList" class="instance-list">
+                <!-- Dynamic instance cards will appear here -->
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <div id="noInstanceSelected" class="empty-state">
+                <h2>No instance selected</h2>
+                <p>Create a new instance or select one from the sidebar.</p>
+            </div>
+            
+            <div id="instanceWorkspace" style="display: none;">
+                <div class="workspace-header">
+                    <div class="instance-info">
+                        <h1 id="instanceName"></h1>
+                        <span id="runtimeBadge" class="badge"></span>
+                        <span class="stats">Files: <span id="fileCount">0</span> | Executions: <span id="execCount">0</span></span>
+                    </div>
+                    <div class="action-buttons">
+                        <button id="renameInstanceBtn" class="btn btn-secondary">Rename</button>
+                        <button id="duplicateInstanceBtn" class="btn btn-secondary">Duplicate</button>
+                        <button id="deleteInstanceBtn" class="btn btn-danger">Delete</button>
+                    </div>
+                </div>
+
+                <div class="tabs">
+                    <button class="tab-btn active" data-tab="files">Files</button>
+                    <button class="tab-btn" data-tab="run">Run</button>
+                    <button class="tab-btn" data-tab="logs">Logs</button>
+                    <button class="tab-btn" data-tab="history">History</button>
+                    <button class="tab-btn" data-tab="settings">Settings</button>
+                </div>
+
+                <!-- Tab: Files -->
+                <div id="filesTab" class="tab-content active">
+                    <div class="upload-area">
+                        <input type="file" id="fileUpload" style="display: none;">
+                        <button id="uploadBtn" class="btn btn-primary">Upload File</button>
+                    </div>
+                    <div id="fileList" class="file-list">
+                        <!-- File list will appear here -->
+                    </div>
+                </div>
+
+                <!-- Tab: Run -->
+                <div id="runTab" class="tab-content">
+                    <div class="runtime-selector">
+                        <label>Runtime:</label>
+                        <select id="runtimeSelect" disabled>
+                            <option value="auto">Auto-detect</option>
+                            <option value="python">Python</option>
+                            <option value="javascript">JavaScript</option>
+                        </select>
+                        <button id="runBtn" class="btn btn-success">▶ Run</button>
+                    </div>
+                    <div id="outputArea" class="output-area">
+                        <h3>Output</h3>
+                        <pre id="outputContent"></pre>
+                    </div>
+                </div>
+
+                <!-- Tab: Logs -->
+                <div id="logsTab" class="tab-content">
+                    <div id="logList" class="log-list">
+                        <!-- Log files list -->
+                    </div>
+                    <div id="logViewer" style="display: none;">
+                        <h4>Log Content</h4>
+                        <pre id="logContent"></pre>
+                    </div>
+                </div>
+
+                <!-- Tab: History -->
+                <div id="historyTab" class="tab-content">
+                    <div id="historyList" class="history-list">
+                        <!-- Execution history -->
+                    </div>
+                </div>
+
+                <!-- Tab: Settings -->
+                <div id="settingsTab" class="tab-content">
+                    <div class="settings-form">
+                        <label>Description</label>
+                        <textarea id="instanceDescription" rows="3"></textarea>
+                        <label>Tags (comma separated)</label>
+                        <input type="text" id="instanceTags">
+                        <label>Runtime Override</label>
+                        <select id="runtimeOverride">
+                            <option value="">Auto-detect</option>
+                            <option value="python">Python (always)</option>
+                            <option value="javascript">JavaScript (always)</option>
+                        </select>
+                        <label>Execution Timeout (seconds)</label>
+                        <input type="number" id="executionTimeout" value="30">
+                        <button id="saveSettingsBtn" class="btn btn-primary">Save Settings</button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal for create/rename -->
+    <div id="modal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h3 id="modalTitle">Create Instance</h3>
+            <input type="text" id="modalInput" placeholder="Instance Name">
+            <textarea id="modalDescription" placeholder="Description (optional)"></textarea>
+            <input type="text" id="modalTags" placeholder="Tags (comma separated)">
+            <button id="modalConfirm" class="btn btn-primary">Confirm</button>
+        </div>
+    </div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
