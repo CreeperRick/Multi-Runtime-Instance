@@ -5,7 +5,7 @@ let socket = io();
 
 // DOM elements
 const instanceListEl = document.getElementById('instanceList');
-const searchInput = document.getElementById('searchInstances');
+const searchInput = document document.getElementById('searchInstances');
 const sortSelect = document.getElementById('sortInstances');
 const noInstanceDiv = document.getElementById('noInstanceSelected');
 const workspaceDiv = document.getElementById('instanceWorkspace');
@@ -24,6 +24,10 @@ const instanceTags = document.getElementById('instanceTags');
 const runtimeOverride = document.getElementById('runtimeOverride');
 const executionTimeout = document.getElementById('executionTimeout');
 const saveSettingsBtn = document.getElementById('saveSettingsBtn');
+
+// File upload elements
+const uploadBtn = document.getElementById('uploadBtn');
+const fileUpload = document.getElementById('fileUpload');
 
 // Modal elements
 const modal = document.getElementById('modal');
@@ -172,7 +176,7 @@ async function loadFiles() {
             }
         });
     });
-    // Attach view handlers (optional: preview)
+    // Attach view handlers
     document.querySelectorAll('.file-name').forEach(span => {
         span.addEventListener('click', () => {
             alert('File content preview not implemented. Download via /api/instances/.../files/...');
@@ -262,7 +266,6 @@ runBtn.addEventListener('click', async () => {
         const data = await res.json();
         if (res.ok) {
             outputPre.textContent = `[Exit code: ${data.exit_code}, Duration: ${data.duration_ms.toFixed(2)} ms]\n\nSTDOUT:\n${data.stdout}\n\nSTDERR:\n${data.stderr}`;
-            // Refresh history and logs
             loadHistory();
             loadLogs();
             fetchInstances();
@@ -274,7 +277,37 @@ runBtn.addEventListener('click', async () => {
     }
 });
 
-// Create instance modal
+// ==================== FILE UPLOAD HANDLER ====================
+if (uploadBtn && fileUpload) {
+    uploadBtn.addEventListener('click', () => {
+        fileUpload.click();
+    });
+
+    fileUpload.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (!file || !currentInstance) return;
+        const formData = new FormData();
+        formData.append('file', file);
+        try {
+            const res = await fetch(`/api/instances/${currentInstance.instance_id}/upload`, {
+                method: 'POST',
+                body: formData
+            });
+            if (res.ok) {
+                await loadFiles();
+                await fetchInstances();
+            } else {
+                alert('Upload failed');
+            }
+        } catch (err) {
+            console.error(err);
+            alert('Upload error');
+        }
+        fileUpload.value = '';
+    });
+}
+
+// ==================== INSTANCE CRUD MODALS ====================
 document.getElementById('createInstanceBtn').addEventListener('click', () => {
     modalTitle.textContent = 'Create New Instance';
     modalInput.value = '';
@@ -293,176 +326,323 @@ modalConfirm.addEventListener('click', async () => {
         await fetch('/api/instances/create', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name, description, tags })
+            body: 'application/json' },
+            body: JSON.stringify({ name, description, tags JSON.stringify({ name, description, tags })
+        });
+        await fetchInstances })
+        });
+       ();
+    } else await fetchInstances();
+    } else if (modalAction if (modalAction === 'rename' === 'rename' && && renameInstanceId renameInstanceId) {
+        await) {
+        await fetch(`/api fetch(`/api/instances/${/instances/${renameInstanceId}/rename`, {
+           renameInstanceId}/ method: 'PUTrename`, {
+           ',
+            headers: method: 'PUT',
+            headers: { 'Content-Type { 'Content-Type': 'application': 'application/json/json' },
+            body' },
+            body:: JSON.stringify({ JSON.stringify({ name })
+        });
+        await fetchInst name })
         });
         await fetchInstances();
-    } else if (modalAction === 'rename' && renameInstanceId) {
-        await fetch(`/api/instances/${renameInstanceId}/rename`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name })
-        });
-        await fetchInstances();
-        if (currentInstance && currentInstance.instance_id === renameInstanceId) {
-            await loadInstance(renameInstanceId);
+        ifances();
+        if (currentInstance && (currentInstance && currentInstance.instance_id currentInstance.instance_id === renameInstanceId === renameInstanceId) {
+            await) {
+            await loadInstance( loadInstance(renameInstanceId);
         }
-    }
-    modal.style.display = 'none';
+renameInstanceId);
+        }
+       }
+    modal }
+   .style.display = 'none';
+    modalDescription.style.display modal.style.display = 'none';
+    modalDescription.style = 'block';
+   .display = 'block';
+    modalTags.style.display modalTags.style.display = 'block = 'block';
 });
 
-document.getElementById('renameInstanceBtn').addEventListener('click', () => {
+document.getElementById('renameInstance';
+});
+
+document.getElementById('renameInstanceBtn').Btn').addEventListener('clickaddEventListener('click', () =>', () => {
+    if (!currentInstance) return {
     if (!currentInstance) return;
+    modalTitle.textContent = 'R;
     modalTitle.textContent = 'Rename Instance';
-    modalInput.value = currentInstance.name;
+   ename Instance';
+    modalInput.value = modalInput.value = currentInstance.name currentInstance.name;
+    modalDescription.style.display = 'none;
     modalDescription.style.display = 'none';
-    modalTags.style.display = 'none';
-    modalAction = 'rename';
+    modalTags';
+    modalTags.style.display = '.style.display = 'none';
+none';
+    modalAction = 'rename    modalAction = 'rename';
+    renameInstance';
     renameInstanceId = currentInstance.instance_id;
+    modal.style.displayId = currentInstance =.instance_id;
     modal.style.display = 'block';
+ 'block';
 });
 
-document.getElementById('duplicateInstanceBtn').addEventListener('click', async () => {
+document.getElementById('du});
+
+document.getElementById('duplicateInstanceBtn').addplicateInstanceBtn').addEventListener('click', async () =>EventListener('click', async () => {
+    if (!currentInstance) return {
     if (!currentInstance) return;
-    if (confirm(`Duplicate "${currentInstance.name}"?`)) {
-        await fetch(`/api/instances/${currentInstance.instance_id}/duplicate`, { method: 'POST' });
+    if (confirm(`;
+    if (confirm(`Duplicate "${Duplicate "${currentInstance.name}"?`))currentInstance.name}" {
+        await fetch(`/?`)) {
+        await fetch(`/api/api/instances/${currentInstanceinstances/${currentInstance.instance_id}/du.instance_id}/duplicate`, { methodplicate`, { method: 'POST': 'POST' });
+        await });
         await fetchInstances();
+    fetchInstances();
     }
 });
 
-document.getElementById('deleteInstanceBtn').addEventListener('click', async () => {
+document.getElementById }
+});
+
+document.getElementById('deleteInstanceBtn').add('deleteInstanceBtnEventListener('click', async').addEventListener(' ()click', async () => {
+    if => {
     if (!currentInstance) return;
-    if (confirm(`Delete instance "${currentInstance.name}"? This cannot be undone.`)) {
-        await fetch(`/api/instances/${currentInstance.instance_id}`, { method: 'DELETE' });
-        currentInstance = null;
-        await fetchInstances();
+ (!currentInstance) return;
+    if (confirm(`Delete instance "${currentInstance.name}"? This    if (confirm(`Delete instance "${currentInstance.name}"? This cannot be undone. cannot be undone.`)) {
+`)) {
+        await fetch(`/api/instances        await fetch(`//${currentInstance.instanceapi/instances/${currentInstance.instance_id}`, {_id}`, { method: 'DELETE' });
+        current method: 'DELETE' });
+        currentInstance = nullInstance = null;
+        await fetchInst;
+        await fetchInstancesances();
+        show();
         showNoInstance();
     }
 });
 
-function showNoInstance() {
-    noInstanceDiv.style.display = 'block';
-    workspaceDiv.style.display = 'none';
+function showNoInstance();
+    }
+});
+
+function showNoInstance()NoInstance() {
+    noInstanceDiv {
+    noInstanceDiv.style.display = '.style.display = 'block';
+block';
+    workspace    workspaceDiv.style.display =Div.style.display = 'none';
+    'none';
     currentInstance = null;
 }
 
-// Search and sort listeners
-searchInput.addEventListener('input', () => renderInstanceList());
-sortSelect.addEventListener('change', () => renderInstanceList());
+// Search currentInstance = null;
+}
 
-// Tab switching
-document.querySelectorAll('.tab-btn').forEach(btn => {
+// Search and sort and sort
+searchInput.addEventListener('input',
+searchInput.addEventListener('input', () => () => renderInstanceList renderInstanceList());
+sortSelect.addEventListener('());
+sortSelect.addEventListener('change', () =>change', () => renderInstanceList());
+
+// renderInstanceList());
+
+// Tab Tab switching switching
+document.querySelectorAll('.tab-btn').forEach
+document.querySelectorAll('.tab-btn').forEach(btn =>(btn => {
     btn.addEventListener('click', () => {
-        const tabId = btn.dataset.tab;
-        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        document.querySelectorAll('.tab-content').forEach(tc => tc.classList.remove('active'));
-        document.getElementById(`${tabId}Tab`).classList.add('active');
+    btn.addEventListener('click', () => {
+        const tab {
+        const tabId = btn.datId = btn.dataset.tabaset.tab;
+       ;
+        document.querySelectorAll('.tab-btn'). document.querySelectorAll('.tab-btn').forEach(b => bforEach(b => b.classList.remove('active.classList.remove('active'));
+        btn.classList.add('active'));
+        btn.classList.add');
+('active');
+        document.querySelectorAll('.tab-content').        document.querySelectorAll('.tab-content').forEach(tc => tc.classList.remove('forEach(tc =>active'));
+        document tc.classList.remove('active'));
+        document.getElementById(`${tabId.getElementById(`${tabId}Tab`).}Tab`).classList.addclassList.add('('active');
+        
+       active');
+        
+        // If terminal // If terminal tab is opened tab is opened and and terminal terminal not initialized, init not initialized, init it
+        if it
+        if (tabId === (tabId === 'terminal' && 'terminal' && !terminalInitialized) {
+            !terminalInitialized setTimeout(initTerminal, 100) {
+            setTimeout(initTerm);
+        }inal, 100);
+        else if (tab } else if (tabId === 'terminalId === 'terminal' && term &&' && term && fitAddon) fitAddon) {
+            {
+            setTimeout(() setTimeout(() => {
+                fit => {
+                fitAddon.fitAddon.fit();
+                socket.emit('terminal_resize', { rows:();
+                socket.emit('terminal_resize', { rows: term.rows, term.rows, cols: term.col cols: term.cols });
+            },s });
+            }, 100);
+        100);
+        }
+    });
+ }
     });
 });
 
-// Socket events for real-time updates
-socket.on('instances_changed', (data) => {
+// Socket events
+});
+
+// Socket events
+socket.on('instsocket.on('instances_changed',ances_changed', (data) (data) => => {
+    fetchInst {
     fetchInstances();
 });
 
-socket.on('active_instance_changed', (data) => {
-    if (data.instance_id && (!currentInstance || currentInstance.instance_id !== data.instance_id)) {
-        const inst = instances.find(i => i.instance_id === data.instance_id);
-        if (inst) switchInstance(inst);
+socketances();
+});
+
+socket.on('active_instance.on('active_instance_changed', (data) =>_changed', (data) => {
+    if (data {
+    if (data.instance.instance_id && (!_idcurrentInstance || currentInstance && (!currentInstance || currentInstance.instance_id !==.instance_id !== data.instance_id)) data.instance_id)) {
+        const inst {
+        const inst = instances.find(i => i.instance_id = instances.find(i => i.instance_id === data === data.instance_id);
+       .instance_id);
+        if ( if (inst) switchInstanceinst) switchInstance(inst);
+   (inst);
     }
 });
 
-// Helper: escape HTML
+// Helper }
+});
+
+// Helper: escape HTML: escape HTML
 function escapeHtml(str) {
-    if (!str) return '';
-    return str.replace(/[&<>]/g, function(m) {
-        if (m === '&') return '&amp;';
-        if (m === '<') return '&lt;';
-        if (m === '>') return '&gt;';
+    if
+function escapeHtml(str) {
+    if (!str (!str) return '';
+    return str.replace(/[) return '';
+    return str.replace(/[&<>]/g,&<>]/g, function(m) function(m) {
+        if (m === '&') {
+        if (m === '&') return '&amp return '&amp;';
+        if;';
+        if (m === '< (m === '<') return '&') return '&lt;';
+       lt;';
+        if (m === if (m === '>') return '>') return '&gt;';
+        return m '&gt;';
         return m;
     });
+;
+    });
 }
 
-// ==================== TERMINAL (ROOT) ====================
-let term = null;
+// ====================}
+
+// ==================== TERMINAL TERMINAL ( (ROOT) =ROOT) ====================
+let===================
+let term = null term = null;
+let fitAddon;
 let fitAddon = null;
+let = null;
 let terminalInitialized = false;
 
-function initTerminal() {
-    if (terminalInitialized) return;
-    // Check if xterm is loaded
+function init terminalInitialized = false;
+
+function initTerminal()Terminal() {
+    if (terminal {
+    if (terminalInitialized) returnInitialized) return;
     if (typeof Terminal === 'undefined') {
-        console.warn('xterm.js not loaded yet – retrying in 500ms');
-        setTimeout(initTerminal, 500);
+;
+    if (typeof Terminal === 'undefined') {
+               console.warn(' console.warn('xterm.js notxterm.js not loaded yet, retrying...');
+        setTimeout(initTerm loaded yet, retrying...');
+        setTimeout(initTerminalinal, 200);
         return;
     }
-    const container = document.getElementById('terminal-container');
-    if (!container) {
-        console.warn('Terminal container not found');
+    const container = document.getElementById, 200);
         return;
     }
+    const container = document.getElementById('terminal-container('terminal-container');
+    if (!container');
+    if (!container) return;
+    
+    term) return;
     
     term = new Terminal({
-        cursorBlink: true,
+        cursor = new Terminal({
+        cursorBlink: trueBlink: true,
         theme: {
-            background: '#000000',
-            foreground: '#00ff00'
+            background:,
+        theme: {
+            background: '#000000 '#000000',
+            foreground:',
+            foreground: '# '#00ff00'
+00ff00'
         }
     });
-    // FitAddon is global from xterm-addon-fit
-    fitAddon = new FitAddon.FitAddon();
-    term.loadAddon(fitAddon);
-    term.open(container);
-    fitAddon.fit();
+    fitAddon        }
+    });
+    fitAddon = new FitAdd = new FitAddon.FitAddon.FitAddon();
+    termon();
+    term.loadAddon(f.loadAddon(fitAddon);
+    termitAddon);
+    term.open(.open(container);
+    fitcontainer);
+    fitAddon.fitAddon.fit();
     
-    term.onData((data) => {
-        socket.emit('terminal_input', { data: data });
+    term.on();
+    
+    term.onData((data)Data((data) => {
+        socket => {
+        socket.emit('.emit('terminal_input', { dataterminal_input', { data: data });
+    });
+: data });
     });
     
-    socket.on('terminal_output', (msg) => {
-        if (term) term.write(msg.data);
+    socket    
+    socket.on('terminal_output.on('terminal_output', (msg) => {
+        if', (msg) => {
+        if (term) term (term) term.write(msg.write(msg.data.data);
     });
     
-    socket.on('terminal_ready', () => {
-        term.write('\r\n\x1b[32m*** Root terminal ready ***\x1b[0m\r\n');
-        term.write('\x1b[1;32m$ \x1b[0m');  // show prompt
+    socket.on('terminal_ready', ());
     });
     
-    socket.on('terminal_error', (msg) => {
-        term.write(`\r\n\x1b[31mError: ${msg.message}\x1b[0m\r\n`);
+    socket.on('terminal => {
+        term_ready', () => {
+        term.write('\r\n.write('\r\n\x1b[32m*** Root\x1b[ terminal ready ***32m*** Root terminal ready ***\x1b\x1b[0m\r\n');
+        term.write('\x1[0m\r\n');
+        term.write('\x1b[1;b[1;32m$ \32m$ \x1b[x1b[0m0m');
     });
     
-    // Start the shell
+    socket.on('terminal_error');
+    });
+    
+    socket.on('terminal_error', (msg', (msg) => {
+        term) => {
+        term.write(`\r.write(`\r\n\x1b\n\x1b[31mError: ${[31mError: ${msg.message}\x1bmsg.message}\x1b[0m\r\n`);
+    });
+    
+    socket.emit('[0m\r\n`);
+    });
+    
     socket.emit('terminal_start');
     
-    // Handle window resize
-    window.addEventListener('resize', () => {
-        if (fitAddon && term && document.getElementById('terminalTab').classList.contains('active')) {
-            fitAddon.fit();
-            socket.emit('terminal_resize', {
-                rows: term.rows,
-                cols: term.cols
-            });
+    windowterminal_start.addEventListener('resize');
+    
+    window.addEventListener('resize', () =>', () => {
+        if (fitAddon && {
+        if (fitAddon && term term && document.getElementById(' && document.getElementById('terminalTab').classterminalTab').classList.contains('activeList.contains('active')) {
+')) {
+            fit            fitAddon.fitAddon.fit();
+            socket.emit('terminal_resize();
+            socket.emit('terminal_resize', {', { rows rows: term.rows: term.rows, cols: term.cols });
+       , cols: term.cols });
+ }
+    });
         }
     });
     
+    terminalInitialized    
     terminalInitialized = true;
+ = true;
 }
 
-// When Terminal tab is clicked, initialize or resize
-const terminalTabBtn = document.querySelector('[data-tab="terminal"]');
-if (terminalTabBtn) {
-    terminalTabBtn.addEventListener('click', () => {
-        if (!terminalInitialized) {
-            initTerminal();
-        } else if (term && fitAddon) {
-            setTimeout(() => {
-                fitAddon.fit();
-                socket.emit('terminal_resize', { rows: term.rows, cols: term.cols });
-            }, 100);
-        }
-    });
-}
+// Start}
 
-// Initial load
+// Start
+fetchInstances
 fetchInstances();
