@@ -3,7 +3,9 @@ import json
 import shutil
 import subprocess
 import uuid
-import json
+import threading
+import ptyprocess
+import select
 from datetime import datetime
 from pathlib import Path
 from flask import Flask, render_template, request, jsonify, send_from_directory
@@ -12,31 +14,30 @@ from werkzeug.utils import secure_filename
 import eventlet
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
-import threading
 
 from bootstrap import InstanceBootstrapper
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your-secret-key-change-this'
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max upload
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB
 socketio = SocketIO(app, cors_allowed_origins="*")
 
 # Global state
-terminal_processes = {}  # sid -> ptyprocess.PtyProcess
-terminal_read_threads = {}  # sid -> threading.Thread
-instances_registry = {}  # instance_id -> metadata
+instances_registry = {}
 current_instance_id = None
 bootstrapper = InstanceBootstrapper()
+
+# Terminal sessions (root shell)
+terminal_processes = {}
+terminal_read_threads = {}
 
 # ==================== Instance Discovery & Repair ====================
 
 def refresh_instances_registry():
-    """Re-scan instances directory and update registry."""
     global instances_registry
     instances_dir = Path("instances")
     if not instances_dir.exists():
         return
-    
     new_registry = {}
     for item in instances_dir.iterdir():
         if item.is_dir():
@@ -45,15 +46,12 @@ def refresh_instances_registry():
                 try:
                     with open(metadata_path, 'r') as f:
                         metadata = json.load(f)
-                        # Ensure instance_id is present
-                        if 'instance_id' not in metadata:
-                            metadata['instance_id'] = str(uuid.uuid4())
-                        # Re-detect runtime
-                        metadata['detected_runtime'] = bootstrapper._detect_runtime(item)
-                        # Update file count
-                        files_dir = item / "files"
-                        metadata['total_files'] = sum(1 for _ in files_dir.iterdir() if _.is_file()) if files_dir.exists() else 0
-                        new_registry[metadata['instance_id']] = metadata
+                    if 'instance_id' not in metadata:
+                        metadata['instance_id'] = str(uuid.uuid4())
+                    metadata['detected_runtime'] = bootstrapper._detect_runtime(item)
+                    files_dir = item / "files"
+                    metadata['total_files'] = sum(1 for _ in files_dir.iterdir() if _.is_file()) if files_dir.exists() else 0
+                    new_registry[metadata['instance_id']] = metadata
                 except Exception as e:
                     print(f"Error loading metadata for {item.name}: {e}")
     instances_registry = new_registry
@@ -61,7 +59,6 @@ def refresh_instances_registry():
 
 class InstancesDirHandler(FileSystemEventHandler):
     def on_any_event(self, event):
-        # Debounce: wait a bit then refresh
         eventlet.spawn_after(0.5, refresh_instances_registry)
 
 def start_watchdog():
@@ -72,14 +69,12 @@ def start_watchdog():
 # ==================== Helper Functions ====================
 
 def get_instance_path(instance_id: str) -> Path:
-    """Get filesystem path for an instance."""
     metadata = instances_registry.get(instance_id)
     if not metadata:
         raise ValueError("Instance not found")
     return Path("instances") / metadata['name']
 
 def update_instance_metadata(instance_id: str, updates: dict):
-    """Update metadata.json and registry."""
     if instance_id not in instances_registry:
         return
     metadata = instances_registry[instance_id]
@@ -92,11 +87,8 @@ def update_instance_metadata(instance_id: str, updates: dict):
     socketio.emit('instances_changed', {'instances': list(instances_registry.values())})
 
 def log_execution(instance_id: str, runtime: str, stdout: str, stderr: str, exit_code: int, duration_ms: float):
-    """Save execution log and update history."""
     instance_path = get_instance_path(instance_id)
     timestamp = datetime.now()
-    
-    # Save log file
     log_filename = f"execution_{timestamp.strftime('%Y%m%d_%H%M%S')}.log"
     log_path = instance_path / "logs" / log_filename
     log_content = f"""Timestamp: {timestamp.isoformat()}
@@ -111,8 +103,6 @@ Exit Code: {exit_code}
 {stderr}
 """
     log_path.write_text(log_content)
-    
-    # Update history.json
     history_path = instance_path / "history" / "history.json"
     history = []
     if history_path.exists():
@@ -120,7 +110,6 @@ Exit Code: {exit_code}
             history = json.loads(history_path.read_text())
         except:
             pass
-    
     history_entry = {
         "timestamp": timestamp.isoformat(),
         "runtime": runtime,
@@ -131,12 +120,9 @@ Exit Code: {exit_code}
         "log_file": log_filename
     }
     history.append(history_entry)
-    # Keep last 100 entries
     if len(history) > 100:
         history = history[-100:]
     history_path.write_text(json.dumps(history, indent=2))
-    
-    # Update metadata totals
     metadata = instances_registry[instance_id]
     update_instance_metadata(instance_id, {
         "last_used": timestamp.isoformat(),
@@ -159,19 +145,15 @@ def create_instance():
     name = data.get('name', '').strip()
     if not name:
         return jsonify({'error': 'Instance name required'}), 400
-    
-    # Sanitize name for filesystem
     safe_name = "".join(c for c in name if c.isalnum() or c in ' ._-')
     if not safe_name:
         safe_name = "Instance"
-    
     instances_dir = Path("instances")
     instance_path = instances_dir / safe_name
     counter = 1
     while instance_path.exists():
         instance_path = instances_dir / f"{safe_name}_{counter}"
         counter += 1
-    
     instance_path.mkdir()
     instance_id = str(uuid.uuid4())
     metadata = {
@@ -185,7 +167,6 @@ def create_instance():
         "total_files": 0,
         "total_executions": 0
     }
-    
     bootstrapper._repair_instance(instance_path, metadata)
     refresh_instances_registry()
     return jsonify({'instance_id': instance_id, 'name': instance_path.name}), 201
@@ -194,21 +175,17 @@ def create_instance():
 def rename_instance(instance_id):
     if instance_id not in instances_registry:
         return jsonify({'error': 'Instance not found'}), 404
-    
     data = request.json
     new_name = data.get('name', '').strip()
     if not new_name:
         return jsonify({'error': 'New name required'}), 400
-    
     safe_name = "".join(c for c in new_name if c.isalnum() or c in ' ._-')
     if not safe_name:
         safe_name = "RenamedInstance"
-    
     old_path = get_instance_path(instance_id)
     new_path = old_path.parent / safe_name
     if new_path.exists():
         return jsonify({'error': 'Name already exists'}), 409
-    
     old_path.rename(new_path)
     update_instance_metadata(instance_id, {'name': safe_name})
     refresh_instances_registry()
@@ -218,25 +195,20 @@ def rename_instance(instance_id):
 def delete_instance(instance_id):
     if instance_id not in instances_registry:
         return jsonify({'error': 'Instance not found'}), 404
-    
     instance_path = get_instance_path(instance_id)
     shutil.rmtree(instance_path)
     refresh_instances_registry()
-    
-    # If current instance was deleted, switch to first available
     global current_instance_id
     if current_instance_id == instance_id:
         current_instance_id = next(iter(instances_registry.keys())) if instances_registry else None
         if current_instance_id:
             bootstrapper.save_last_active(current_instance_id)
-    
     return jsonify({'success': True})
 
 @app.route('/api/instances/<instance_id>/duplicate', methods=['POST'])
 def duplicate_instance(instance_id):
     if instance_id not in instances_registry:
         return jsonify({'error': 'Instance not found'}), 404
-    
     src_path = get_instance_path(instance_id)
     new_name = f"{src_path.name}_copy"
     dest_path = src_path.parent / new_name
@@ -244,9 +216,7 @@ def duplicate_instance(instance_id):
     while dest_path.exists():
         dest_path = src_path.parent / f"{new_name}_{counter}"
         counter += 1
-    
     shutil.copytree(src_path, dest_path)
-    # Generate new instance ID
     new_instance_id = str(uuid.uuid4())
     metadata_path = dest_path / "metadata.json"
     if metadata_path.exists():
@@ -258,7 +228,6 @@ def duplicate_instance(instance_id):
         metadata['total_executions'] = 0
         with open(metadata_path, 'w') as f:
             json.dump(metadata, f, indent=2)
-    
     refresh_instances_registry()
     return jsonify({'success': True, 'instance_id': new_instance_id})
 
@@ -295,21 +264,16 @@ def upload_file(instance_id):
         return jsonify({'error': 'Instance not found'}), 404
     if 'file' not in request.files:
         return jsonify({'error': 'No file provided'}), 400
-    
     file = request.files['file']
     if file.filename == '':
         return jsonify({'error': 'Empty filename'}), 400
-    
     filename = secure_filename(file.filename)
     instance_path = get_instance_path(instance_id)
     files_dir = instance_path / "files"
     files_dir.mkdir(exist_ok=True)
     file.save(files_dir / filename)
-    
-    # Update file count
     total_files = sum(1 for _ in files_dir.iterdir() if _.is_file())
     update_instance_metadata(instance_id, {'total_files': total_files})
-    
     return jsonify({'success': True, 'filename': filename})
 
 @app.route('/api/instances/<instance_id>/files/<filename>', methods=['DELETE'])
@@ -320,7 +284,6 @@ def delete_file(instance_id, filename):
     file_path = instance_path / "files" / secure_filename(filename)
     if file_path.exists():
         file_path.unlink()
-        # Update file count
         total_files = sum(1 for _ in (instance_path / "files").iterdir() if _.is_file())
         update_instance_metadata(instance_id, {'total_files': total_files})
         return jsonify({'success': True})
@@ -330,10 +293,8 @@ def delete_file(instance_id, filename):
 def run_code(instance_id):
     if instance_id not in instances_registry:
         return jsonify({'error': 'Instance not found'}), 404
-    
     data = request.json or {}
-    override_runtime = data.get('runtime')  # 'python', 'javascript', or None for auto
-    
+    override_runtime = data.get('runtime')
     instance_path = get_instance_path(instance_id)
     metadata = instances_registry[instance_id]
     settings_path = instance_path / "settings.json"
@@ -341,9 +302,7 @@ def run_code(instance_id):
     if settings_path.exists():
         with open(settings_path, 'r') as f:
             settings = json.load(f)
-    
     runtime_override = settings.get('runtime_override')
-    # Priority: request override > instance settings > auto-detect
     if override_runtime:
         runtime = override_runtime
     elif runtime_override:
@@ -351,22 +310,17 @@ def run_code(instance_id):
     else:
         runtime = metadata.get('detected_runtime', 'none')
         if runtime == 'hybrid':
-            runtime = 'python'  # default for hybrid
-    
+            runtime = 'python'
     if runtime not in ['python', 'javascript']:
         return jsonify({'error': f'No executable entry file for runtime: {runtime}'}), 400
-    
-    # Check entry file exists
     if runtime == 'python':
         entry_file = instance_path / "main.py"
         command = ['python', str(entry_file)]
     else:
         entry_file = instance_path / "main.js"
         command = ['node', str(entry_file)]
-    
     if not entry_file.exists():
         return jsonify({'error': f'Entry file {entry_file.name} not found in instance'}), 400
-    
     timeout = settings.get('execution_timeout', 30)
     start_time = datetime.now()
     try:
@@ -431,6 +385,42 @@ def get_history(instance_id):
             pass
     return jsonify([])
 
+@app.route('/api/instances/<instance_id>/settings', methods=['GET'])
+def get_instance_settings(instance_id):
+    if instance_id not in instances_registry:
+        return jsonify({'error': 'Instance not found'}), 404
+    instance_path = get_instance_path(instance_id)
+    settings_path = instance_path / "settings.json"
+    if settings_path.exists():
+        with open(settings_path, 'r') as f:
+            settings = json.load(f)
+        return jsonify(settings)
+    return jsonify({"runtime_override": None, "execution_timeout": 30, "auto_save_logs": True})
+
+@app.route('/api/instances/<instance_id>/settings', methods=['PUT'])
+def update_instance_settings(instance_id):
+    if instance_id not in instances_registry:
+        return jsonify({'error': 'Instance not found'}), 404
+    data = request.json
+    instance_path = get_instance_path(instance_id)
+    settings_path = instance_path / "settings.json"
+    settings = {}
+    if settings_path.exists():
+        with open(settings_path, 'r') as f:
+            settings = json.load(f)
+    settings.update({
+        'runtime_override': data.get('runtime_override'),
+        'execution_timeout': data.get('execution_timeout', 30),
+        'auto_save_logs': data.get('auto_save_logs', True)
+    })
+    with open(settings_path, 'w') as f:
+        json.dump(settings, f, indent=2)
+    update_instance_metadata(instance_id, {
+        'description': data.get('description', ''),
+        'tags': data.get('tags', [])
+    })
+    return jsonify({'success': True})
+
 @app.route('/api/instances/search', methods=['GET'])
 def search_instances():
     query = request.args.get('q', '').lower()
@@ -455,48 +445,34 @@ def sort_instances():
         instances_list.sort(key=lambda x: x.get('last_used') or '', reverse=reverse)
     return jsonify(instances_list)
 
-# ==================== SocketIO Events ====================
+# ==================== Terminal (Root Shell) ====================
 
-@socketio.on('connect')
-def handle_connect():
-    emit('instances_changed', {'instances': list(instances_registry.values())})
-    if current_instance_id:
-        emit('active_instance_changed', {'instance_id': current_instance_id})
-        
 @socketio.on('terminal_start')
 def handle_terminal_start():
-    """Spawn a root shell for the client."""
     sid = request.sid
     if sid in terminal_processes:
-        # already running
         return
-    
     try:
-        # Spawn bash with sudo to become root (requires NOPASSWD in sudoers)
-        # Alternatively use ['/bin/bash'] if app is already root.
+        # Spawn bash directly (already root)
         proc = ptyprocess.PtyProcess.spawn(['/bin/bash'], echo=False)
         terminal_processes[sid] = proc
-        
-        # Start reading thread
+
         def read_output():
             while sid in terminal_processes and proc.isalive():
                 try:
-                    # Use select to avoid blocking forever
                     r, _, _ = select.select([proc.fd], [], [], 0.1)
                     if r:
                         data = proc.read(4096)
                         if data:
                             socketio.emit('terminal_output', {'data': data}, room=sid)
                     else:
-                        # Check if process died
                         if not proc.isalive():
                             break
                 except Exception as e:
                     print(f"Terminal read error: {e}")
                     break
-            # Cleanup on exit
             cleanup_terminal(sid)
-        
+
         thread = threading.Thread(target=read_output, daemon=True)
         thread.start()
         terminal_read_threads[sid] = thread
@@ -525,7 +501,6 @@ def handle_terminal_resize(data):
             print(f"Resize error: {e}")
 
 def cleanup_terminal(sid):
-    """Kill process and remove references."""
     proc = terminal_processes.pop(sid, None)
     if proc and proc.isalive():
         proc.terminate(force=True)
@@ -536,16 +511,20 @@ def handle_disconnect():
     sid = request.sid
     cleanup_terminal(sid)
 
+# ==================== SocketIO Events ====================
+
+@socketio.on('connect')
+def handle_connect():
+    emit('instances_changed', {'instances': list(instances_registry.values())})
+    if current_instance_id:
+        emit('active_instance_changed', {'instance_id': current_instance_id})
+
 # ==================== Main ====================
 
 if __name__ == '__main__':
-    # Bootstrap
     bootstrap_result = bootstrapper.bootstrap()
     instances_registry.update(bootstrap_result['instances'])
     current_instance_id = bootstrap_result['last_active']
-    
-    # Start watchdog for real-time instance detection
     watchdog_thread = threading.Thread(target=start_watchdog, daemon=True)
     watchdog_thread.start()
-    
     socketio.run(app, host='0.0.0.0', port=5000, debug=True)
