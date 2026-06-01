@@ -90,7 +90,6 @@ cd Multi-Runtime-Instance
 # Install Python dependencies
 pip install setuptools --upgrade --break-system-packages
 pip install gevent gevent-websocket --break-system-packages
-pip uninstall eventlet -y
 pip install -r requirements.txt
 ```
 
