@@ -5,7 +5,7 @@ let socket = io();
 
 // DOM elements
 const instanceListEl = document.getElementById('instanceList');
-const searchInput = document.getElementById('searchInstances');   // fixed
+const searchInput = document.getElementById('searchInstances');
 const sortSelect = document.getElementById('sortInstances');
 const noInstanceDiv = document.getElementById('noInstanceSelected');
 const workspaceDiv = document.getElementById('instanceWorkspace');
@@ -378,6 +378,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
             setTimeout(() => {
                 fitAddon.fit();
                 socket.emit('terminal_resize', { rows: term.rows, cols: term.cols });
+                term.focus();
             }, 100);
         }
     });
@@ -401,39 +402,78 @@ function escapeHtml(str) {
     });
 }
 
-// Terminal
+// ==================== TERMINAL (ROOT) ====================
 let term = null;
 let fitAddon = null;
 let terminalInitialized = false;
 
 function initTerminal() {
-    if (terminalInitialized) return;
+    if (terminalInitialized) {
+        console.log("Terminal already initialized");
+        return;
+    }
     if (typeof Terminal === 'undefined') {
-        setTimeout(initTerminal, 200);
+        console.warn('xterm.js not loaded – retrying in 500ms');
+        setTimeout(initTerminal, 500);
         return;
     }
     const container = document.getElementById('terminal-container');
-    if (!container) return;
-    term = new Terminal({ cursorBlink: true, theme: { background: '#000000', foreground: '#00ff00' } });
+    if (!container) {
+        console.error("Terminal container not found!");
+        return;
+    }
+    console.log("Creating xterm.js terminal...");
+    term = new Terminal({
+        cursorBlink: true,
+        theme: { background: '#000000', foreground: '#00ff00' },
+        fontSize: 14
+    });
     fitAddon = new FitAddon.FitAddon();
     term.loadAddon(fitAddon);
     term.open(container);
     fitAddon.fit();
-    term.onData(data => socket.emit('terminal_input', { data }));
-    socket.on('terminal_output', msg => term.write(msg.data));
+    
+    // Send input to backend
+    term.onData((data) => {
+        console.log("Sending input:", JSON.stringify(data));
+        socket.emit('terminal_input', { data: data });
+    });
+    
+    // Receive output from backend
+    socket.on('terminal_output', (msg) => {
+        console.log("Received output, length:", msg.data.length);
+        if (term) term.write(msg.data);
+    });
+    
     socket.on('terminal_ready', () => {
+        console.log("Terminal ready event received");
         term.write('\r\n\x1b[32m*** Root terminal ready ***\x1b[0m\r\n');
         term.write('\x1b[1;32m$ \x1b[0m');
+        // Force focus
+        setTimeout(() => {
+            term.focus();
+            console.log("Terminal focused");
+        }, 200);
     });
-    socket.on('terminal_error', msg => term.write(`\r\n\x1b[31mError: ${msg.message}\x1b[0m\r\n`));
+    
+    socket.on('terminal_error', (msg) => {
+        console.error("Terminal error:", msg);
+        term.write(`\r\n\x1b[31mError: ${msg.message}\x1b[0m\r\n`);
+    });
+    
+    // Start the shell on the backend
     socket.emit('terminal_start');
+    
+    // Handle window resize
     window.addEventListener('resize', () => {
         if (fitAddon && term && document.getElementById('terminalTab').classList.contains('active')) {
             fitAddon.fit();
             socket.emit('terminal_resize', { rows: term.rows, cols: term.cols });
         }
     });
+    
     terminalInitialized = true;
 }
 
+// Start fetching instances
 fetchInstances();
