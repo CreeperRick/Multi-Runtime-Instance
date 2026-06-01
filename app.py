@@ -474,7 +474,7 @@ def handle_terminal_start():
     try:
         # Spawn bash with sudo to become root (requires NOPASSWD in sudoers)
         # Alternatively use ['/bin/bash'] if app is already root.
-        proc = ptyprocess.PtyProcess.spawn(['sudo', '-i'], echo=False)
+        proc = ptyprocess.PtyProcess.spawn(['/bin/bash'], echo=False)
         terminal_processes[sid] = proc
         
         # Start reading thread
