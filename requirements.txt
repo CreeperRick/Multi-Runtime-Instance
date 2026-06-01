@@ -1,5 +1,0 @@
-Flask==2.3.3
-flask-socketio==5.3.4
-python-socketio==5.9.0
-eventlet==0.33.3
-watchdog==3.0.0
