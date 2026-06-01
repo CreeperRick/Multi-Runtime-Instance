@@ -426,30 +426,33 @@ function initTerminal() {
     term = new Terminal({
         cursorBlink: true,
         theme: { background: '#000000', foreground: '#00ff00' },
-        fontSize: 14
+        fontSize: 14,
+        convertEol: true
     });
     fitAddon = new FitAddon.FitAddon();
     term.loadAddon(fitAddon);
     term.open(container);
     fitAddon.fit();
     
-    // Send input to backend
+    // Write a test line to confirm terminal works
+    term.write("Initializing terminal...\r\n");
+    
     term.onData((data) => {
         console.log("Sending input:", JSON.stringify(data));
         socket.emit('terminal_input', { data: data });
     });
     
-    // Receive output from backend
     socket.on('terminal_output', (msg) => {
         console.log("Received output, length:", msg.data.length);
-        if (term) term.write(msg.data);
+        if (term) {
+            term.write(msg.data);
+        }
     });
     
     socket.on('terminal_ready', () => {
         console.log("Terminal ready event received");
         term.write('\r\n\x1b[32m*** Root terminal ready ***\x1b[0m\r\n');
-        term.write('\x1b[1;32m$ \x1b[0m');
-        // Force focus
+        term.write('\x1b[1;32m# \x1b[0m');  // root prompt
         setTimeout(() => {
             term.focus();
             console.log("Terminal focused");
@@ -461,10 +464,8 @@ function initTerminal() {
         term.write(`\r\n\x1b[31mError: ${msg.message}\x1b[0m\r\n`);
     });
     
-    // Start the shell on the backend
     socket.emit('terminal_start');
     
-    // Handle window resize
     window.addEventListener('resize', () => {
         if (fitAddon && term && document.getElementById('terminalTab').classList.contains('active')) {
             fitAddon.fit();
@@ -475,5 +476,4 @@ function initTerminal() {
     terminalInitialized = true;
 }
 
-// Start fetching instances
 fetchInstances();
