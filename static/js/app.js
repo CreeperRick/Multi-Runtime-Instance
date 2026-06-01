@@ -175,7 +175,6 @@ async function loadFiles() {
     // Attach view handlers (optional: preview)
     document.querySelectorAll('.file-name').forEach(span => {
         span.addEventListener('click', () => {
-            // For simplicity, just log; you could add download or preview
             alert('File content preview not implemented. Download via /api/instances/.../files/...');
         });
     });
@@ -384,26 +383,24 @@ function escapeHtml(str) {
     });
 }
 
-// Initial load
-fetchInstances();
-
-// Also add a global fetch for instance settings GET endpoint (not defined in app.py yet? We'll add a missing route)
-// Actually we need to add a route to get settings. Let's add that now in app.py - but I'll include in the code above.
-// Since the user asked for "generate me the code", I'll add that missing route in app.py now (I'll update the app.py code section).
-
-// Terminal (root) initialization
+// ==================== TERMINAL (ROOT) ====================
 let term = null;
 let fitAddon = null;
 let terminalInitialized = false;
 
 function initTerminal() {
     if (terminalInitialized) return;
+    // Check if xterm is loaded
     if (typeof Terminal === 'undefined') {
-        console.warn('xterm.js not loaded yet');
+        console.warn('xterm.js not loaded yet – retrying in 500ms');
+        setTimeout(initTerminal, 500);
         return;
     }
     const container = document.getElementById('terminal-container');
-    if (!container) return;
+    if (!container) {
+        console.warn('Terminal container not found');
+        return;
+    }
     
     term = new Terminal({
         cursorBlink: true,
@@ -412,6 +409,7 @@ function initTerminal() {
             foreground: '#00ff00'
         }
     });
+    // FitAddon is global from xterm-addon-fit
     fitAddon = new FitAddon.FitAddon();
     term.loadAddon(fitAddon);
     term.open(container);
@@ -427,17 +425,19 @@ function initTerminal() {
     
     socket.on('terminal_ready', () => {
         term.write('\r\n\x1b[32m*** Root terminal ready ***\x1b[0m\r\n');
+        term.write('\x1b[1;32m$ \x1b[0m');  // show prompt
     });
     
     socket.on('terminal_error', (msg) => {
         term.write(`\r\n\x1b[31mError: ${msg.message}\x1b[0m\r\n`);
     });
     
+    // Start the shell
     socket.emit('terminal_start');
     
-    // Resize handler
+    // Handle window resize
     window.addEventListener('resize', () => {
-        if (fitAddon && term) {
+        if (fitAddon && term && document.getElementById('terminalTab').classList.contains('active')) {
             fitAddon.fit();
             socket.emit('terminal_resize', {
                 rows: term.rows,
@@ -449,15 +449,20 @@ function initTerminal() {
     terminalInitialized = true;
 }
 
-// When Terminal tab is activated, initialize the terminal
+// When Terminal tab is clicked, initialize or resize
 const terminalTabBtn = document.querySelector('[data-tab="terminal"]');
 if (terminalTabBtn) {
     terminalTabBtn.addEventListener('click', () => {
         if (!terminalInitialized) {
-            setTimeout(initTerminal, 100); // slight delay to ensure DOM is ready
-        } else if (term) {
-            fitAddon.fit();
-            socket.emit('terminal_resize', { rows: term.rows, cols: term.cols });
+            initTerminal();
+        } else if (term && fitAddon) {
+            setTimeout(() => {
+                fitAddon.fit();
+                socket.emit('terminal_resize', { rows: term.rows, cols: term.cols });
+            }, 100);
         }
     });
 }
+
+// Initial load
+fetchInstances();
