@@ -390,3 +390,74 @@ fetchInstances();
 // Also add a global fetch for instance settings GET endpoint (not defined in app.py yet? We'll add a missing route)
 // Actually we need to add a route to get settings. Let's add that now in app.py - but I'll include in the code above.
 // Since the user asked for "generate me the code", I'll add that missing route in app.py now (I'll update the app.py code section).
+
+// Terminal (root) initialization
+let term = null;
+let fitAddon = null;
+let terminalInitialized = false;
+
+function initTerminal() {
+    if (terminalInitialized) return;
+    if (typeof Terminal === 'undefined') {
+        console.warn('xterm.js not loaded yet');
+        return;
+    }
+    const container = document.getElementById('terminal-container');
+    if (!container) return;
+    
+    term = new Terminal({
+        cursorBlink: true,
+        theme: {
+            background: '#000000',
+            foreground: '#00ff00'
+        }
+    });
+    fitAddon = new FitAddon.FitAddon();
+    term.loadAddon(fitAddon);
+    term.open(container);
+    fitAddon.fit();
+    
+    term.onData((data) => {
+        socket.emit('terminal_input', { data: data });
+    });
+    
+    socket.on('terminal_output', (msg) => {
+        if (term) term.write(msg.data);
+    });
+    
+    socket.on('terminal_ready', () => {
+        term.write('\r\n\x1b[32m*** Root terminal ready ***\x1b[0m\r\n');
+    });
+    
+    socket.on('terminal_error', (msg) => {
+        term.write(`\r\n\x1b[31mError: ${msg.message}\x1b[0m\r\n`);
+    });
+    
+    socket.emit('terminal_start');
+    
+    // Resize handler
+    window.addEventListener('resize', () => {
+        if (fitAddon && term) {
+            fitAddon.fit();
+            socket.emit('terminal_resize', {
+                rows: term.rows,
+                cols: term.cols
+            });
+        }
+    });
+    
+    terminalInitialized = true;
+}
+
+// When Terminal tab is activated, initialize the terminal
+const terminalTabBtn = document.querySelector('[data-tab="terminal"]');
+if (terminalTabBtn) {
+    terminalTabBtn.addEventListener('click', () => {
+        if (!terminalInitialized) {
+            setTimeout(initTerminal, 100); // slight delay to ensure DOM is ready
+        } else if (term) {
+            fitAddon.fit();
+            socket.emit('terminal_resize', { rows: term.rows, cols: term.cols });
+        }
+    });
+}
