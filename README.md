@@ -102,6 +102,7 @@ python-socketio==5.9.0
 gevent==23.9.1
 gevent-websocket==0.10.1
 watchdog==3.0.0
+ptyprocess==0.7.0
 ```
 
 ---
