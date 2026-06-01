@@ -50,6 +50,7 @@
                 </div>
 
                 <div class="tabs">
+                    <button class="tab-btn" data-tab="terminal">Terminal (Root)</button>
                     <button class="tab-btn active" data-tab="files">Files</button>
                     <button class="tab-btn" data-tab="run">Run</button>
                     <button class="tab-btn" data-tab="logs">Logs</button>
@@ -58,6 +59,13 @@
                 </div>
 
                 <!-- Tab: Files -->
+                <!-- Tab: Terminal -->
+                <div id="terminalTab" class="tab-content">
+                    <div id="terminal-container" style="height: 500px; background: black;"></div>
+                    <p class="warning" style="color: red; margin-top: 10px;">
+                        ⚠️ This terminal runs with <strong>root privileges</strong>. Be careful!
+                    </p>
+                </div>
                 <div id="filesTab" class="tab-content active">
                     <div class="upload-area">
                         <input type="file" id="fileUpload" style="display: none;">
