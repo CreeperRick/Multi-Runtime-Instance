@@ -1,0 +1,358 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+    background: #f5f5f5;
+    height: 100vh;
+    overflow: hidden;
+}
+
+.app-container {
+    display: flex;
+    height: 100vh;
+}
+
+/* Sidebar */
+.sidebar {
+    width: 320px;
+    background: #2c3e50;
+    color: white;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+}
+
+.sidebar-header {
+    padding: 20px;
+    border-bottom: 1px solid #34495e;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.sidebar-header h2 {
+    font-size: 1.2rem;
+}
+
+.instance-controls {
+    padding: 15px;
+    border-bottom: 1px solid #34495e;
+}
+
+.search-input {
+    width: 100%;
+    padding: 8px;
+    margin-bottom: 10px;
+    border: 1px solid #34495e;
+    background: #34495e;
+    color: white;
+    border-radius: 4px;
+}
+
+.sort-select {
+    width: 100%;
+    padding: 8px;
+    background: #34495e;
+    color: white;
+    border: 1px solid #46607a;
+    border-radius: 4px;
+}
+
+.instance-list {
+    flex: 1;
+    padding: 10px;
+    overflow-y: auto;
+}
+
+.instance-card {
+    background: #34495e;
+    margin-bottom: 10px;
+    padding: 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.2s;
+    border-left: 3px solid transparent;
+}
+
+.instance-card:hover {
+    background: #3d566e;
+}
+
+.instance-card.active {
+    background: #1abc9c;
+    border-left-color: #f1c40f;
+}
+
+.instance-name {
+    font-weight: bold;
+    margin-bottom: 5px;
+    display: flex;
+    justify-content: space-between;
+}
+
+.instance-stats {
+    font-size: 0.8rem;
+    opacity: 0.8;
+    margin-top: 5px;
+}
+
+.instance-runtime {
+    font-size: 0.7rem;
+    background: rgba(0,0,0,0.3);
+    padding: 2px 6px;
+    border-radius: 10px;
+    display: inline-block;
+}
+
+/* Main content */
+.main-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    background: #ecf0f1;
+}
+
+.empty-state {
+    text-align: center;
+    margin-top: 100px;
+    color: #7f8c8d;
+}
+
+.workspace-header {
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.instance-info h1 {
+    font-size: 1.5rem;
+    margin-bottom: 5px;
+}
+
+.badge {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: bold;
+    margin-right: 10px;
+}
+
+.badge.python { background: #306998; color: white; }
+.badge.javascript { background: #f7df1e; color: #000; }
+.badge.hybrid { background: #9b59b6; color: white; }
+.badge.none { background: #95a5a6; color: white; }
+
+.stats {
+    font-size: 0.85rem;
+    color: #7f8c8d;
+}
+
+.action-buttons .btn {
+    margin-left: 8px;
+}
+
+/* Tabs */
+.tabs {
+    display: flex;
+    gap: 5px;
+    margin-bottom: 20px;
+    border-bottom: 2px solid #ddd;
+}
+
+.tab-btn {
+    padding: 10px 20px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 1rem;
+    color: #7f8c8d;
+    transition: all 0.2s;
+}
+
+.tab-btn.active {
+    color: #2c3e50;
+    border-bottom: 2px solid #1abc9c;
+    margin-bottom: -2px;
+}
+
+.tab-content {
+    display: none;
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.tab-content.active {
+    display: block;
+}
+
+/* Buttons */
+.btn {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: opacity 0.2s;
+}
+
+.btn:hover {
+    opacity: 0.8;
+}
+
+.btn-primary {
+    background: #1abc9c;
+    color: white;
+}
+
+.btn-secondary {
+    background: #95a5a6;
+    color: white;
+}
+
+.btn-danger {
+    background: #e74c3c;
+    color: white;
+}
+
+.btn-success {
+    background: #27ae60;
+    color: white;
+}
+
+/* File list */
+.file-list, .log-list, .history-list {
+    margin-top: 15px;
+}
+
+.file-item, .log-item, .history-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px;
+    border-bottom: 1px solid #ecf0f1;
+}
+
+.file-name, .log-name {
+    cursor: pointer;
+    color: #3498db;
+}
+
+.delete-file {
+    background: #e74c3c;
+    color: white;
+    border: none;
+    padding: 4px 8px;
+    border-radius: 3px;
+    cursor: pointer;
+}
+
+/* Upload area */
+.upload-area {
+    margin-bottom: 20px;
+}
+
+/* Runtime selector */
+.runtime-selector {
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.runtime-selector select {
+    padding: 6px;
+    border-radius: 4px;
+    border: 1px solid #ddd;
+}
+
+/* Output area */
+.output-area {
+    background: #2c3e50;
+    color: #ecf0f1;
+    padding: 15px;
+    border-radius: 6px;
+    margin-top: 15px;
+}
+
+.output-area pre {
+    background: #1a252f;
+    padding: 10px;
+    border-radius: 4px;
+    overflow-x: auto;
+    font-family: monospace;
+    margin-top: 10px;
+}
+
+/* Settings form */
+.settings-form {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.settings-form label {
+    font-weight: bold;
+}
+
+.settings-form input, .settings-form textarea, .settings-form select {
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-family: inherit;
+}
+
+/* Modal */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+}
+
+.modal-content {
+    background: white;
+    margin: 15% auto;
+    padding: 20px;
+    width: 400px;
+    border-radius: 8px;
+}
+
+.close {
+    float: right;
+    font-size: 28px;
+    cursor: pointer;
+}
+
+.modal-content input, .modal-content textarea {
+    width: 100%;
+    margin: 10px 0;
+    padding: 8px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .sidebar {
+        width: 260px;
+    }
+    .workspace-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+}
