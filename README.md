@@ -88,6 +88,7 @@ git clone https://github.com/CreeperRick/Multi-Runtime-Instance
 cd Multi-Runtime-Instance
 
 # Install Python dependencies
+pip install setuptools --upgrade --break-system-packages
 pip install -r requirements.txt
 ```
 
